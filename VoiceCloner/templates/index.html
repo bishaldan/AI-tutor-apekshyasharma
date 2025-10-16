@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Voice Cloner (YourTTS)</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; margin: 0; background: #f5f7fb; }
+    .container { max-width: 900px; margin: 40px auto; background: #fff; border-radius: 10px; padding: 24px; box-shadow: 0 4px 24px rgba(0,0,0,0.06); }
+    h1 { margin: 0 0 12px; }
+    .tabs { display: flex; gap: 8px; margin: 16px 0 24px; }
+    .tab { padding: 10px 14px; border: 1px solid #dbe1ea; border-radius: 8px; cursor: pointer; background: #f6f8fb; }
+    .tab.active { background: #0d6efd; color: #fff; border-color: #0d6efd; }
+    .panel { display: none; }
+    .panel.active { display: block; }
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .stack { display: flex; flex-direction: column; gap: 10px; }
+    label { font-weight: 600; }
+    select, input[type="text"], textarea { padding: 10px; border: 1px solid #dbe1ea; border-radius: 8px; font-size: 14px; }
+    button { background: #0d6efd; color: #fff; border: none; border-radius: 8px; padding: 10px 14px; cursor: pointer; }
+    button.secondary { background: #6c757d; }
+    button:disabled { opacity: .6; cursor: not-allowed; }
+    .section { margin-top: 20px; padding-top: 20px; border-top: 1px dashed #e5e9f2; }
+    .audio { width: 100%; }
+    .hint { color: #6c757d; font-size: 13px; }
+    .loading { color: #0d6efd; font-style: italic; display: none; margin-top: 8px; }
+    .error { color: #b00020; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Voice Cloner (YourTTS)</h1>
+    <div class="hint">Record and clone your voice, or type text for normal TTS. Select emotion/task to guide delivery.</div>
+
+    <div class="tabs">
+      <div id="tab-record" class="tab active">Record Voice</div>
+      <div id="tab-tts" class="tab">Type Text</div>
+    </div>
+
+    <div id="panel-record" class="panel active">
+      <div class="stack">
+        <div class="row">
+          <div class="stack">
+            <label>Controls</label>
+            <div class="stack" style="flex-direction: row; gap: 8px;">
+              <button id="btn-start">Start Recording</button>
+              <button id="btn-stop" class="secondary" disabled>Stop</button>
+              <button id="btn-clone" disabled>Clone Voice</button>
+            </div>
+            <div class="hint">Recording uses your microphone via MediaRecorder (webm/ogg). We convert to WAV on the server.</div>
+          </div>
+          <div class="stack">
+            <label>Style</label>
+            <div class="row">
+              <div class="stack">
+                <span>Emotion</span>
+                <select id="rec-emotion">
+                  <option value="">none</option>
+                  <option>happy</option>
+                  <option>sad</option>
+                  <option>calm</option>
+                  <option>angry</option>
+                </select>
+              </div>
+              <div class="stack">
+                <span>Task</span>
+                <select id="rec-task">
+                  <option value="default">default</option>
+                  <option>assistant</option>
+                  <option>storytelling</option>
+                  <option>narration</option>
+                  <option>translator</option>
+                </select>
+              </div>
+            </div>
+            <div class="stack">
+              <span>Language</span>
+              <select id="rec-lang">
+                <option value="en" selected>English (en)</option>
+                <option value="fr-fr">French (fr-fr)</option>
+                <option value="pt-br">Portuguese (pt-br)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <label>Recorded preview</label>
+          <audio id="recorded-audio" class="audio" controls></audio>
+        </div>
+
+        <div class="section">
+          <label>Cloned output</label>
+          <audio id="cloned-audio" class="audio" controls></audio>
+          <div id="rec-loading" class="loading">Synthesizing voice... please wait.</div>
+          <div id="rec-error" class="error"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="panel-tts" class="panel">
+      <div class="stack">
+        <label for="tts-text">Text</label>
+        <textarea id="tts-text" rows="4" placeholder="Type something to synthesize..."></textarea>
+
+        <div class="row">
+          <div class="stack">
+            <label>Emotion</label>
+            <select id="tts-emotion">
+              <option value="">none</option>
+              <option>happy</option>
+              <option>sad</option>
+              <option>calm</option>
+              <option>angry</option>
+            </select>
+          </div>
+          <div class="stack">
+            <label>Task</label>
+            <select id="tts-task">
+              <option value="default">default</option>
+              <option>assistant</option>
+              <option>storytelling</option>
+              <option>narration</option>
+              <option>translator</option>
+            </select>
+          </div>
+          <div class="stack">
+            <label>Language</label>
+            <select id="tts-lang">
+              <option value="en" selected>English (en)</option>
+              <option value="fr-fr">French (fr-fr)</option>
+              <option value="pt-br">Portuguese (pt-br)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="stack" style="margin-top: 8px;">
+          <button id="btn-generate">Generate Voice</button>
+          <div id="tts-loading" class="loading">Synthesizing voice... please wait.</div>
+          <div id="tts-error" class="error"></div>
+        </div>
+
+        <div class="section">
+          <label>Output</label>
+          <audio id="tts-audio" class="audio" controls></audio>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Tabs
+    const tabRecord = document.getElementById('tab-record');
+    const tabTts = document.getElementById('tab-tts');
+    const panelRecord = document.getElementById('panel-record');
+    const panelTts = document.getElementById('panel-tts');
+
+    function activate(tab) {
+      const isRecord = tab === 'record';
+      tabRecord.classList.toggle('active', isRecord);
+      tabTts.classList.toggle('active', !isRecord);
+      panelRecord.classList.toggle('active', isRecord);
+      panelTts.classList.toggle('active', !isRecord);
+    }
+    tabRecord.onclick = () => activate('record');
+    tabTts.onclick = () => activate('tts');
+
+    // Recording
+    let mediaRecorder;
+    let chunks = [];
+    const btnStart = document.getElementById('btn-start');
+    const btnStop = document.getElementById('btn-stop');
+    const btnClone = document.getElementById('btn-clone');
+    const recordedAudio = document.getElementById('recorded-audio');
+    const clonedAudio = document.getElementById('cloned-audio');
+    const recEmotion = document.getElementById('rec-emotion');
+    const recTask = document.getElementById('rec-task');
+    const recLang = document.getElementById('rec-lang');
+    const recLoading = document.getElementById('rec-loading');
+    const recError = document.getElementById('rec-error');
+
+    btnStart.onclick = async () => {
+      recError.textContent = '';
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        chunks = [];
+        mediaRecorder = new MediaRecorder(stream);
+        mediaRecorder.ondataavailable = e => { if (e.data.size) chunks.push(e.data); };
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          recordedAudio.src = URL.createObjectURL(blob);
+          btnClone.disabled = false;
+        };
+        mediaRecorder.start();
+        btnStart.disabled = true;
+        btnStop.disabled = false;
+        btnClone.disabled = true;
+      } catch (err) {
+        recError.textContent = 'Microphone permission denied or unsupported browser.';
+      }
+    };
+
+    btnStop.onclick = () => {
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+      btnStart.disabled = false;
+      btnStop.disabled = true;
+    };
+
+    btnClone.onclick = async () => {
+      recError.textContent = '';
+      recLoading.style.display = 'block';
+      btnClone.disabled = true;
+
+      try {
+        // Recreate blob from audio element source
+        const res = await fetch(recordedAudio.src);
+        const blob = await res.blob();
+        const fd = new FormData();
+        const file = new File([blob], 'recording.webm', { type: blob.type || 'audio/webm' });
+        fd.append('audio', file);
+        fd.append('text', 'Hello! This is your cloned voice.');
+        fd.append('emotion', recEmotion.value);
+        fd.append('task', recTask.value);
+        fd.append('language', recLang.value);
+
+        const r = await fetch('/upload_audio', { method: 'POST', body: fd });
+        const data = await r.json();
+
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Synthesis failed');
+
+        clonedAudio.src = data.audioUrl;
+        clonedAudio.play().catch(() => {});
+      } catch (e) {
+        recError.textContent = e.message || 'Failed to clone voice.';
+      } finally {
+        recLoading.style.display = 'none';
+        btnClone.disabled = false;
+      }
+    };
+
+    // Text-to-Speech
+    const ttsText = document.getElementById('tts-text');
+    const ttsEmotion = document.getElementById('tts-emotion');
+    const ttsTask = document.getElementById('tts-task');
+    const ttsLang = document.getElementById('tts-lang');
+    const ttsAudio = document.getElementById('tts-audio');
+    const ttsLoading = document.getElementById('tts-loading');
+    const ttsError = document.getElementById('tts-error');
+    const btnGenerate = document.getElementById('btn-generate');
+
+    btnGenerate.onclick = async () => {
+      ttsError.textContent = '';
+      ttsLoading.style.display = 'block';
+      btnGenerate.disabled = true;
+
+      try {
+        const payload = {
+          text: ttsText.value || '',
+          emotion: ttsEmotion.value,
+          task: ttsTask.value,
+          language: ttsLang.value,
+        };
+
+        const r = await fetch('/generate_text', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+        const data = await r.json();
+
+        if (!r.ok || !data.ok) throw new Error(data.error || 'Synthesis failed');
+
+        ttsAudio.src = data.audioUrl;
+        ttsAudio.play().catch(() => {});
+      } catch (e) {
+        ttsError.textContent = e.message || 'Failed to generate voice.';
+      } finally {
+        ttsLoading.style.display = 'none';
+        btnGenerate.disabled = false;
+      }
+    };
+  </script>
+</body>
+</html>

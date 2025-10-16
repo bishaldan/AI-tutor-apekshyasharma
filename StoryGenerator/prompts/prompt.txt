@@ -1,0 +1,16 @@
+Generate a concise and engaging short story based on the following criteria:
+
+- Target Audience/Grade Level: {grade}
+- Difficulty/Complexity: {difficulty}
+- Main Theme/Genre: {theme}
+
+The story should have a clear and appealing title.
+The content should be suitable for the specified grade level and difficulty.
+The output MUST be in valid JSON format, exactly like this:
+
+```json
+{{
+    "title": "Your Story Title Here",
+    "content": "Your story content here. Use \\n\\n for paragraph breaks to ensure readability in the JSON output."
+}}
+```

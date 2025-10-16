@@ -1,0 +1,10 @@
+flask>=2.2
+# Keep numpy modern to avoid conflicts with common libs
+numpy>=1.24,<2.0
+librosa>=0.10,<0.11
+soundfile>=0.12
+transformers>=4.33
+scipy>=1.11
+pydub>=0.25
+# Coqui TTS; pip will detect the Conda-installed torch and not replace it
+TTS==0.21.3
